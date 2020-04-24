@@ -18,6 +18,8 @@
 
 use strict;
 use Getopt::Std;
+use File::Temp qw/ :mktemp /;;
+
 my %opt=();
 getopts("adhl:t:v",\%opt);
 
@@ -81,7 +83,7 @@ if ($opt{t}) {
 
 # temporary filename:
 # safer this way, so many users can run this script simultaneusly
-my $tempfile="/tmp/matapicos.dump.$$"; 
+my $tempfile = mktemp "/tmp/removespikes.tmp.XXXXXXXX";
 
 ###########################################################################
 # Dump the rrd database to the temporary file (as XML)
