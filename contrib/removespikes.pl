@@ -174,14 +174,14 @@ while (<FICH>) {
   print FSAL "$linea\n";
 }
 close FICH;
-close FSAL;
+close FSAL or die "Error writing to $tempfile.xml: $!";
 
 ###########################################################################
 # Cleanup and move new file to the place of original one
 # and original one gets backed up.
 if ($cont == 0 && $VERBOSE) { print "No peaks found.!\n"; }
 else {
-  rename($ARGV[0],"$ARGV[0].old");
+  rename($ARGV[0],"$ARGV[0].old") or die "rename of $ARGV[0] to $ARGV[0].old failed: $!";
   $lino="rrdtool restore $tempfile.xml $ARGV[0]";
   system($lino);
   die "$0: Unable to execute the rrdtool restore on $ARGV[0] - $! - $@\n" if $? != 0;
