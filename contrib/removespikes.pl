@@ -20,6 +20,9 @@ use strict;
 use Getopt::Std;
 use File::Temp qw/ :mktemp /;;
 
+use Data::Dumper;
+$Data::Dumper::Sortkeys = 1;
+
 my %opt=();
 getopts("adhl:t:v",\%opt);
 
@@ -93,10 +96,25 @@ system("rrdtool dump $ARGV[0] > $tempfile") == 0 or die "\n";
 open(FICH,"<$tempfile") 
    || die "$0: Cannot open file $tempfile:\n $! - $@";
 
+my %fthresh;
+
+my $numds=0;
+
 while (<FICH>) {
   chomp;
   $linea=$_;
   $cdo=0;
+
+  # Gather DS min/max values
+  if(m _<(min|max)>(\d+\.\d+.*)</(min|max)>_) {
+    $fthresh{"0$numds"}{$1} = $2;
+    next;
+  }
+  elsif(m _</ds>_) {
+    $numds++;
+    next;
+  }
+
   if ($linea=~/^(.*)<row>/) { $tstamp=$1; }
   if ($linea=~/(<row>.*)$/) { $tresto=$1; }
   if (/<v>\s?\d\.\d+e.(\d+)\s?<\/v>/) {
@@ -112,6 +130,13 @@ while (<FICH>) {
 }
 
 close FICH;
+
+if(!$opt{t} && !$opt{l} && scalar %fthresh) {
+  $BINNING = 0;
+  $THRESH = undef;
+  print "Using min/max thresholds defined in RRD (override with -t or -l)\n" if $VERBOSE;
+  print "fthresh:\n", Dumper \%fthresh if $DEBUG;
+}
 
 ###########################################################################
 # Scan the hash to get the percentage variation of each value
@@ -129,7 +154,6 @@ if ($DEBUG || $ANALYZE) {
      print $tot{$a}." = ".$por{$lino}."%\n";
    }
    print "---------------\n\n";
-   exit if $ANALYZE;
 }
 
 
@@ -137,8 +161,11 @@ if ($DEBUG || $ANALYZE) {
 # Open the XML dump, and create a new one removing the spikes:
 open(FICH,"<$tempfile") || 
    die "$0: Cannot open $tempfile for reading: $!-$@";
-open(FSAL,">$tempfile.xml")  || 
-   die "$0: Cannot open $tempfile.xml for writing: $!-$@";
+
+if(!$ANALYZE) {
+  open(FSAL,">$tempfile.xml")  ||
+     die "$0: Cannot open $tempfile.xml for writing: $!-$@";
+}
 
 $linbak='';
 $cont=0;
@@ -158,8 +185,13 @@ while (<FICH>) {
           $b=substr("0$lino",-2).":$1";         # calculate the max percentage of this DS
           if (($BINNING &&                      #
 		($por{$b}< $LIMIT)) ||          # if this line represents less than $LIMIT
-	      (!$BINNING &&			#
-		($c > $THRESH))) {              # or the value is larger then $THRESH
+	      (!$BINNING && defined($THRESH) &&	#
+		($c > $THRESH)) ||              # or the value is larger then $THRESH
+	      (!$BINNING && !defined($THRESH) && defined($fthresh{"0$lino"}{max}) &&
+		($c > $fthresh{"0$lino"}{max})) || # or larger than ds max
+	      (!$BINNING && !defined($THRESH) && defined($fthresh{"0$lino"}{min}) &&
+		($c < $fthresh{"0$lino"}{min})) )  # or smaller than ds min
+	  {
             $linea=$tstamp.$linbak;             # we dump it
             $cdo=1;
             $tresto=$linbak;
@@ -169,13 +201,18 @@ while (<FICH>) {
     }
     $linbak=$tresto;
     if ($cdo==1) { 
-      print "Chopping peak at $tstamp\n" if $DEBUG;
+      print "Chopping peak $c at $tstamp\n" if $DEBUG;
       $cont++; }
   }
   
-  print FSAL "$linea\n";
+  print FSAL "$linea\n" if(!$ANALYZE);
 }
 close FICH;
+
+if($ANALYZE) {
+  exit(0);
+}
+
 close FSAL or die "Error writing to $tempfile.xml: $!";
 
 ###########################################################################
