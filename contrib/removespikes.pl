@@ -84,6 +84,9 @@ if ($opt{t}) {
    printf("Max Value set to %g, disabling bin-based chopping\n",$THRESH) if $VERBOSE;
 }
 
+# Bomb out instead of silently ignoring surplus arguments
+die "Can only process one RRD at a time" if($ARGV[1]);
+
 # temporary filename:
 # safer this way, so many users can run this script simultaneusly
 my $tempfile = mktemp "/tmp/removespikes.tmp.XXXXXXXX";
