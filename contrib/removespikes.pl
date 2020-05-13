@@ -182,7 +182,7 @@ while (<FICH>) {
     @dump=split(/<\/v>/, $tresto);              # split them
     if ($linbak ne '') {
       for ($lino=0;$lino<=$#dump-1;$lino++) {   # for each DS:
-        if ($dump[$lino]=~/\d\.\d+e.(\d+)\s?/) { # grab number (and not a NaN)
+        if ($dump[$lino]=~/-*\d\.\d+e.(\d+)\s?/) { # grab number (and not a NaN)
 	  $c=$&;
           $a=$1*1;                              # and exponent
           $b=substr("0$lino",-2).":$1";         # calculate the max percentage of this DS
@@ -204,7 +204,7 @@ while (<FICH>) {
     }
     $linbak=$tresto;
     if ($cdo==1) { 
-      print "Chopping peak $c at $tstamp\n" if $DEBUG;
+      print "Chopping peak at $tstamp\n" if $DEBUG;
       $cont++; }
   }
   
